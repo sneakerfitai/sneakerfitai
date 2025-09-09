@@ -9,34 +9,44 @@ import htm from 'htm';
 // Initialize htm with Preact's hyperscript function
 const html = htm.bind(h);
 
-// Helper function to safely get initial products from localStorage
-const getInitialProducts = () => {
-    try {
-        const savedProducts = localStorage.getItem('affiliate-products');
-        return savedProducts ? JSON.parse(savedProducts) : [];
-    } catch (error) {
-        console.error("Failed to parse products from localStorage on init", error);
-        return [];
-    }
-};
+// A placeholder for the base URL of your future backend API.
+// In a real app, you might use environment variables for this.
+const API_BASE_URL = '/api';
 
 const App = () => {
-    const [products, setProducts] = useState(getInitialProducts());
+    const [products, setProducts] = useState([]);
     const [newProductName, setNewProductName] = useState('');
     const [newProductLink, setNewProductLink] = useState('');
     const [newProductImage, setNewProductImage] = useState(null);
     const [imagePreview, setImagePreview] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false); // For form submission
+    const [isFetching, setIsFetching] = useState(true); // For initial product load
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Effect to save products to localStorage whenever they change
+    // Effect to fetch products from the backend when the component mounts
     useEffect(() => {
-        try {
-           localStorage.setItem('affiliate-products', JSON.stringify(products));
-        } catch (error) {
-            console.error("Failed to save products to localStorage", error);
-        }
-    }, [products]);
+        const fetchProducts = async () => {
+            setIsFetching(true);
+            try {
+                // This fetch call will fail with a 404 error until you create a backend
+                // server that responds to this endpoint.
+                const response = await fetch(`${API_BASE_URL}/products`);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok. Is the backend running?');
+                }
+                const data = await response.json();
+                setProducts(data);
+            } catch (error) {
+                console.error("Failed to fetch products:", error);
+                // In a real app, you'd show a persistent error message to the user.
+                // For now, we'll just show an empty list.
+                setProducts([]);
+            } finally {
+                setIsFetching(false);
+            }
+        };
+        fetchProducts();
+    }, []);
 
 
     const handleImageChange = (e) => {
@@ -59,29 +69,62 @@ const App = () => {
         }
 
         setIsLoading(true);
-        
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
 
-        const newProduct = {
-            id: Date.now(),
-            name: newProductName,
-            link: newProductLink,
-            imageSrc: imagePreview,
-        };
+        // Use FormData to send the file and other data to the backend.
+        // This is the standard way to handle file uploads.
+        const formData = new FormData();
+        formData.append('name', newProductName);
+        formData.append('link', newProductLink);
+        formData.append('image', newProductImage); // The actual file object
 
-        setProducts(prevProducts => [newProduct, ...prevProducts]);
+        try {
+            const response = await fetch(`${API_BASE_URL}/products`, {
+                method: 'POST',
+                body: formData, // The browser will automatically set the correct 'Content-Type' header.
+            });
 
-        // Reset form
-        setNewProductName('');
-        setNewProductLink('');
-        setNewProductImage(null);
-        setImagePreview('');
-        (document.getElementById('image-upload') as HTMLInputElement).value = null;
-        setIsLoading(false);
+            if (!response.ok) {
+                throw new Error('Failed to create product on the server.');
+            }
+
+            const newProduct = await response.json(); // The server should return the newly created product.
+            setProducts(prevProducts => [newProduct, ...prevProducts]);
+
+            // Reset form
+            setNewProductName('');
+            setNewProductLink('');
+            setNewProductImage(null);
+            setImagePreview('');
+            (document.getElementById('image-upload') as HTMLInputElement).value = null;
+
+        } catch (error) {
+            console.error('Error adding product:', error);
+            alert('Failed to add product. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleDelete = (productId) => {
+    const handleDelete = async (productId) => {
+        const originalProducts = [...products];
+        // Optimistic UI update: remove the product from the UI immediately.
         setProducts(products.filter(p => p.id !== productId));
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) {
+                // If the delete fails on the server, revert the UI change.
+                setProducts(originalProducts);
+                throw new Error('Failed to delete product on the server.');
+            }
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            alert('Failed to delete product. The item has been restored.');
+            // Revert the UI change on any error.
+            setProducts(originalProducts);
+        }
     };
 
     const isFormValid = newProductName && newProductLink && newProductImage;
@@ -135,27 +178,36 @@ const App = () => {
                              <input type="text" class="search-input" placeholder="Search by product name..." value=${searchTerm} onInput=${(e) => setSearchTerm(e.target.value)} />
                         </div>
                      </div>
-                     ${products.length === 0 && html`<p>You haven't added any products yet. Add one using the form above!</p>`}
-                     ${products.length > 0 && filteredProducts.length === 0 && html`<p>No products match your search.</p>`}
-                     <div class="product-list">
-                        ${filteredProducts.map(product => html`
-                            <div class="product-card" key=${product.id}>
-                                <img class="product-card-image" src=${product.imageSrc} alt=${product.name} />
-                                <div class="product-card-content">
-                                    <h3>${product.name}</h3>
-                                    <div class="product-card-actions">
-                                        <a href=${product.link} target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Visit Link</a>
-                                        <button onClick=${() => handleDelete(product.id)} class="btn btn-danger" aria-label=${`Delete ${product.name}`}>
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
-                                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                                            </svg>
-                                        </button>
+                     ${isFetching ? html`
+                        <div class="loader-container">
+                            <div class="spinner"></div>
+                            <p>Loading products...</p>
+                        </div>
+                     ` : products.length === 0 ? html`
+                        <p>You haven't added any products yet. Add one using the form above!</p>
+                     ` : filteredProducts.length === 0 ? html`
+                        <p>No products match your search.</p>
+                     ` : html`
+                         <div class="product-list">
+                            ${filteredProducts.map(product => html`
+                                <div class="product-card" key=${product.id}>
+                                    <img class="product-card-image" src=${product.imageSrc} alt=${product.name} />
+                                    <div class="product-card-content">
+                                        <h3>${product.name}</h3>
+                                        <div class="product-card-actions">
+                                            <a href=${product.link} target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Visit Link</a>
+                                            <button onClick=${() => handleDelete(product.id)} class="btn btn-danger" aria-label=${`Delete ${product.name}`}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        `)}
-                     </div>
+                            `)}
+                         </div>
+                     `}
                 </section>
             </main>
         </div>

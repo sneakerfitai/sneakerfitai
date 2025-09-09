@@ -294,3 +294,22 @@ input[type="file"] {
     background-color: var(--danger-color);
     color: white;
 }
+
+/* Main Loader for initial fetch */
+.loader-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    padding: 3rem;
+    color: var(--text-light);
+}
+.loader-container .spinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-width: 3px;
+    border-color: rgba(0,0,0,0.1);
+    border-top-color: var(--primary-color);
+    margin: 0;
+}
