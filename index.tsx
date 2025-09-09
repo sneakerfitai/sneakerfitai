@@ -3,16 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { h, render } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
 import htm from 'htm';
-// FIX: Import Type for response schema.
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Initialize htm with Preact's hyperscript function
 const html = htm.bind(h);
-
-// FIX: Initialize the GoogleGenAI client using only the environment variable per guidelines.
-const ai = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
 
 // --- ACTION REQUIRED ---
 // 1. Go to https://mockapi.io and create a free account.
@@ -35,8 +31,26 @@ const App = () => {
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
 
-    // FIX: AI configuration is now determined by the top-level 'ai' constant.
-    const isAiConfigured = !!ai;
+    // State for API Key management
+    const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini-api-key') || '');
+    const [tempApiKey, setTempApiKey] = useState('');
+
+    const isAiConfigured = !!apiKey;
+
+    // Memoize the AI client so it's not re-created on every render
+    const ai = useMemo(() => {
+        if (!apiKey) return null;
+        try {
+            return new GoogleGenAI({ apiKey });
+        } catch (e) {
+            console.error("Failed to initialize GoogleGenAI:", e);
+            // If initialization fails (e.g., bad key format), clear the bad key
+            localStorage.removeItem('gemini-api-key');
+            setApiKey('');
+            return null;
+        }
+    }, [apiKey]);
+
 
     const fetchProducts = useCallback(async (currentPage) => {
         if (!API_ENDPOINT) {
@@ -65,7 +79,6 @@ const App = () => {
             }
         } catch (error) {
             console.error("Failed to fetch products:", error);
-            // Don't clear products on subsequent page load failures
             if (currentPage === 1) {
                 setProducts([]);
             }
@@ -78,12 +91,21 @@ const App = () => {
         }
     }, []);
 
-    // Effect for initial product fetch
     useEffect(() => {
         setIsFetching(true);
         fetchProducts(1);
     }, [fetchProducts]);
 
+    const handleApiKeyChange = (e) => {
+        setTempApiKey(e.target.value);
+    };
+
+    const handleSaveApiKey = () => {
+        if (tempApiKey.trim()) {
+            localStorage.setItem('gemini-api-key', tempApiKey.trim());
+            setApiKey(tempApiKey.trim());
+        }
+    };
 
     const handleImageChange = (e) => {
         const file = e.target.files[0];
@@ -93,14 +115,13 @@ const App = () => {
             reader.onloadend = () => {
                 setImagePreview(reader.result as string);
             };
-            // FIX: Corrected typo from readDataURL to readAsDataURL.
             reader.readAsDataURL(file);
         }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!newProductName || !newProductLink || !imagePreview || !isAiConfigured) {
+        if (!newProductName || !newProductLink || !imagePreview || !isAiConfigured || !ai) {
             alert('Please fill all fields, select an image, and ensure the AI is configured.');
             return;
         }
@@ -108,7 +129,6 @@ const App = () => {
         setIsLoading(true);
         let colorTags = [];
 
-        // Step 1: AI Color Analysis
         try {
             setIsAnalyzing(true);
             const mimeType = imagePreview.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/)[1];
@@ -118,10 +138,8 @@ const App = () => {
                     data: imagePreview.split(',')[1],
                 },
             };
-            // FIX: Updated prompt to be more concise for schema-based JSON response.
             const prompt = "Analyze the dominant colors in this image and list 3-5 simple color names.";
 
-            // FIX: Updated generateContent call to use responseSchema for structured JSON output.
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: { parts: [imagePart, { text: prompt }] },
@@ -136,22 +154,19 @@ const App = () => {
                 },
             });
 
-            // FIX: Removed manual JSON cleaning, as response.text is now a clean JSON string.
             colorTags = JSON.parse(response.text);
         } catch (aiError) {
             console.error("AI color analysis failed, proceeding without tags:", aiError);
-            // Fail gracefully: if AI fails, we still add the product without tags.
         } finally {
             setIsAnalyzing(false);
         }
         
-        // Step 2: Save product to MockAPI
         const newProductData = {
             name: newProductName,
             link: newProductLink,
             imageSrc: imagePreview,
             createdAt: new Date().toISOString(),
-            colorTags: colorTags, // Add the generated tags
+            colorTags: colorTags,
         };
 
         try {
@@ -168,7 +183,6 @@ const App = () => {
             const createdProduct = await response.json();
             setProducts(prevProducts => [createdProduct, ...prevProducts]);
 
-            // Reset form
             setNewProductName('');
             setNewProductLink('');
             setNewProductImage(null);
@@ -236,7 +250,6 @@ const App = () => {
             <main>
                 <section class="form-card" aria-labelledby="form-heading">
                     <h2 id="form-heading">Add New Product</h2>
-                     {/* FIX: Removed UI for API key input. The warning now instructs the user to set the environment variable. */}
                      ${!isAiConfigured && html`
                         <div class="config-needed-card config-gemini">
                             <div class="config-icon">
@@ -246,7 +259,12 @@ const App = () => {
                             </div>
                             <div class="config-content">
                                 <h2>AI Features Disabled</h2>
-                                <p>To enable automatic color tagging, please set the <code>API_KEY</code> environment variable.</p>
+                                <p>To enable automatic color tagging, please enter your Gemini API key below.</p>
+                                <div class="api-key-input-group">
+                                    <input type="password" placeholder="Enter your Gemini API Key" value=${tempApiKey} onInput=${handleApiKeyChange} />
+                                    <button onClick=${handleSaveApiKey} class="btn">Save Key</button>
+                                </div>
+                                <p class="api-key-note">Your key is saved only in your browser's local storage.</p>
                             </div>
                         </div>
                     `}
