@@ -3,17 +3,23 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { h, render } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { GoogleGenAI } from "@google/genai";
 
 // Initialize htm with Preact's hyperscript function
 const html = htm.bind(h);
+
+// Initialize the Google AI client
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
 
 // --- ACTION REQUIRED ---
 // 1. Go to https://mockapi.io and create a free account.
 // 2. Create a new project and then a new "Resource" named "products".
 // 3. Copy the endpoint URL and paste it below.
 const API_ENDPOINT = 'https://68bfa9999c70953d96f01f7f.mockapi.io/products'; // 👈 PASTE YOUR MOCKAPI.IO URL HERE
+const PRODUCTS_PER_PAGE = 20;
 
 const App = () => {
     const [products, setProducts] = useState([]);
@@ -22,35 +28,58 @@ const App = () => {
     const [newProductImage, setNewProductImage] = useState(null);
     const [imagePreview, setImagePreview] = useState('');
     const [isLoading, setIsLoading] = useState(false); // For form submission
+    const [isAnalyzing, setIsAnalyzing] = useState(false); // For AI analysis
     const [isFetching, setIsFetching] = useState(true); // For initial product load
+    const [isFetchingMore, setIsFetchingMore] = useState(false); // For "Load More"
     const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
 
-    // Effect to fetch products from the backend when the component mounts
-    useEffect(() => {
-        const fetchProducts = async () => {
-            if (!API_ENDPOINT) {
-                console.warn("API endpoint not configured. Please add your MockAPI URL.");
-                setIsFetching(false);
-                return;
+    const fetchProducts = useCallback(async (currentPage) => {
+        if (!API_ENDPOINT) {
+            console.warn("API endpoint not configured. Please add your MockAPI URL.");
+            setIsFetching(false);
+            return;
+        }
+
+        const url = `${API_ENDPOINT}?page=${currentPage}&limit=${PRODUCTS_PER_PAGE}&sortBy=createdAt&order=desc`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error('Network response was not ok. Is the API endpoint correct?');
             }
-            setIsFetching(true);
-            try {
-                const response = await fetch(API_ENDPOINT);
-                if (!response.ok) {
-                    throw new Error('Network response was not ok. Is the API endpoint correct?');
-                }
-                const data = await response.json();
-                // MockAPI returns newest first, so we reverse to show newest at the top
-                setProducts(data.reverse());
-            } catch (error) {
-                console.error("Failed to fetch products:", error);
+            const data = await response.json();
+            
+            if (data.length < PRODUCTS_PER_PAGE) {
+                setHasMore(false);
+            }
+
+            if (currentPage === 1) {
+                setProducts(data);
+            } else {
+                setProducts(prevProducts => [...prevProducts, ...data]);
+            }
+        } catch (error) {
+            console.error("Failed to fetch products:", error);
+            // Don't clear products on subsequent page load failures
+            if (currentPage === 1) {
                 setProducts([]);
-            } finally {
-                setIsFetching(false);
             }
-        };
-        fetchProducts();
+        } finally {
+            if (currentPage === 1) {
+                setIsFetching(false);
+            } else {
+                setIsFetchingMore(false);
+            }
+        }
     }, []);
+
+    // Effect for initial product fetch
+    useEffect(() => {
+        setIsFetching(true);
+        fetchProducts(1);
+    }, [fetchProducts]);
 
 
     const handleImageChange = (e) => {
@@ -73,20 +102,51 @@ const App = () => {
         }
 
         setIsLoading(true);
+        let colorTags = [];
 
+        // Step 1: AI Color Analysis
+        try {
+            setIsAnalyzing(true);
+            const mimeType = imagePreview.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/)[1];
+            const imagePart = {
+                inlineData: {
+                    mimeType,
+                    data: imagePreview.split(',')[1],
+                },
+            };
+            const prompt = "Analyze the dominant colors in this image. Respond with a JSON array of 3-5 simple color names (e.g., [\"black\", \"white\", \"green\"]). Respond ONLY with the JSON array, without any markdown formatting or other text.";
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: { parts: [imagePart, { text: prompt }] },
+            });
+
+            // Clean up potential markdown and parse the JSON response
+            let jsonString = response.text.trim();
+            if (jsonString.startsWith('```json')) {
+                jsonString = jsonString.substring(7, jsonString.length - 3).trim();
+            }
+            colorTags = JSON.parse(jsonString);
+        } catch (aiError) {
+            console.error("AI color analysis failed, proceeding without tags:", aiError);
+            // Fail gracefully: if AI fails, we still add the product without tags.
+        } finally {
+            setIsAnalyzing(false);
+        }
+        
+        // Step 2: Save product to MockAPI
         const newProductData = {
             name: newProductName,
             link: newProductLink,
-            imageSrc: imagePreview, // Save the Base64 data URL of the image
-            createdAt: new Date().toISOString(), // Add a timestamp
+            imageSrc: imagePreview,
+            createdAt: new Date().toISOString(),
+            colorTags: colorTags, // Add the generated tags
         };
 
         try {
             const response = await fetch(API_ENDPOINT, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newProductData),
             });
 
@@ -114,7 +174,6 @@ const App = () => {
 
     const handleDelete = async (productId) => {
         const originalProducts = [...products];
-        // Optimistic UI update: remove the product from the UI immediately.
         setProducts(products.filter(p => p.id !== productId));
 
         try {
@@ -122,29 +181,45 @@ const App = () => {
                 method: 'DELETE',
             });
             if (!response.ok) {
-                // If the delete fails on the server, revert the UI change.
                 setProducts(originalProducts);
                 throw new Error('Failed to delete product on the server.');
             }
         } catch (error) {
             console.error('Error deleting product:', error);
             alert('Failed to delete product. The item has been restored.');
-            // Revert the UI change on any error.
             setProducts(originalProducts);
         }
     };
+    
+    const handleLoadMore = () => {
+        const nextPage = page + 1;
+        setPage(nextPage);
+        setIsFetchingMore(true);
+        fetchProducts(nextPage);
+    };
 
     const isFormValid = newProductName && newProductLink && newProductImage;
+    
+    const getButtonText = () => {
+        if (isAnalyzing) return 'Analyzing Image...';
+        if (isLoading) return 'Adding Product...';
+        return 'Add Product';
+    };
 
-    const filteredProducts = products.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProducts = products.filter(product => {
+        const searchTermLower = searchTerm.toLowerCase();
+        const inName = product.name.toLowerCase().includes(searchTermLower);
+        const inTags = product.colorTags && Array.isArray(product.colorTags) 
+            ? product.colorTags.some(tag => tag.toLowerCase().includes(searchTermLower))
+            : false;
+        return inName || inTags;
+    });
 
     return html`
         <div class="app-container">
             <header class="header">
                 <h1>Affiliate Product Manager</h1>
-                <p>Add and manage your affiliate products with ease.</p>
+                <p>Add, manage, and automatically tag your affiliate products with AI.</p>
             </header>
 
             <main>
@@ -173,7 +248,7 @@ const App = () => {
                         </div>
                         <button type="submit" class="btn btn-primary" disabled=${!isFormValid || isLoading}>
                             ${isLoading ? html`<div class="spinner"></div>` : ''}
-                            ${isLoading ? 'Adding...' : 'Add Product'}
+                            ${getButtonText()}
                         </button>
                     </form>
                 </section>
@@ -182,7 +257,7 @@ const App = () => {
                      <div class="list-header">
                         <h2 id="products-heading">Your Products</h2>
                         <div class="search-wrapper">
-                             <input type="text" class="search-input" placeholder="Search by product name..." value=${searchTerm} onInput=${(e) => setSearchTerm(e.target.value)} />
+                             <input type="text" class="search-input" placeholder="Search by name or color..." value=${searchTerm} onInput=${(e) => setSearchTerm(e.target.value)} />
                         </div>
                      </div>
                      ${isFetching ? html`
@@ -211,7 +286,7 @@ const App = () => {
                         </div>
                      `: products.length === 0 ? html`
                         <p>You haven't added any products yet. Add one using the form above!</p>
-                     ` : filteredProducts.length === 0 ? html`
+                     ` : filteredProducts.length === 0 && searchTerm ? html`
                         <p>No products match your search.</p>
                      ` : html`
                          <div class="product-list">
@@ -220,6 +295,12 @@ const App = () => {
                                     <img class="product-card-image" src=${product.imageSrc} alt=${product.name} />
                                     <div class="product-card-content">
                                         <h3>${product.name}</h3>
+                                        ${product.colorTags && product.colorTags.length > 0 && html`
+                                            <div class="color-tags">
+                                                ${product.colorTags.map(tag => html`<span class="color-tag">${tag}</span>`)}
+                                            </div>
+                                        `}
+                                        <div class="spacer"></div>
                                         <div class="product-card-actions">
                                             <a href=${product.link} target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Visit Link</a>
                                             <button onClick=${() => handleDelete(product.id)} class="btn btn-danger" aria-label=${`Delete ${product.name}`}>
@@ -233,6 +314,17 @@ const App = () => {
                                 </div>
                             `)}
                          </div>
+                         ${hasMore && !searchTerm && !isFetchingMore && html`
+                            <div class="load-more-container">
+                                <button onClick=${handleLoadMore} class="btn btn-primary">Load More</button>
+                            </div>
+                         `}
+                         ${isFetchingMore && html`
+                            <div class="loader-container">
+                                <div class="spinner"></div>
+                                <p>Loading more...</p>
+                            </div>
+                         `}
                      `}
                 </section>
             </main>

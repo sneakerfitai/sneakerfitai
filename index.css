@@ -261,13 +261,33 @@ input[type="file"] {
   font-size: 1.125rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  flex-grow: 1;
 }
+
+/* Color Tags */
+.color-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem; /* 6px */
+    margin-bottom: 0.75rem; /* 12px */
+}
+.color-tag {
+    background-color: #e5e7eb; /* cool-gray-200 */
+    color: #4b5563; /* cool-gray-600 */
+    font-size: 0.75rem; /* 12px */
+    font-weight: 500;
+    padding: 0.125rem 0.5rem; /* 2px 8px */
+    border-radius: 9999px; /* full pill shape */
+    text-transform: capitalize;
+}
+.spacer {
+    flex-grow: 1;
+}
+
 
 .product-card-actions {
   display: flex;
   gap: 0.5rem;
-  margin-top: 1rem;
+  margin-top: auto; /* Pushes actions to the bottom */
 }
 
 .btn-secondary {
@@ -312,6 +332,12 @@ input[type="file"] {
     border-color: rgba(0,0,0,0.1);
     border-top-color: var(--primary-color);
     margin: 0;
+}
+
+/* Load More Button */
+.load-more-container {
+    text-align: center;
+    margin-top: 2rem;
 }
 
 /* Configuration Needed Card */
