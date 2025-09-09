@@ -237,7 +237,6 @@ const App = () => {
             <main>
                 <section class="form-card" aria-labelledby="form-heading">
                     <h2 id="form-heading">Add New Product</h2>
-                    {/* FIX: Removed the UI prompt for setting the Gemini API key to comply with coding guidelines. The app must not ask the user for an API key. */}
                     <form onSubmit=${handleSubmit}>
                         <fieldset disabled=${!isAiConfigured}>
                             <div class="form-group">
