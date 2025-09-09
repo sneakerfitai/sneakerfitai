@@ -74,6 +74,17 @@ body {
   color: var(--secondary-color);
 }
 
+.form-card fieldset {
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.form-card fieldset:disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
 .form-group {
   margin-bottom: 1.5rem;
 }
@@ -351,6 +362,31 @@ input[type="file"] {
   align-items: flex-start;
   margin-top: 1rem;
 }
+
+.config-needed-card.config-gemini {
+    background-color: #fef2f2;
+    border-color: #fecaca;
+    margin: 0 0 2rem 0;
+}
+
+.config-needed-card.config-gemini h2,
+.config-needed-card.config-gemini p,
+.config-needed-card.config-gemini ol,
+.config-needed-card.config-gemini a {
+    color: #991b1b;
+}
+
+.config-needed-card.config-gemini .config-icon {
+    color: #ef4444;
+}
+
+.config-needed-card.config-gemini code {
+    background-color: #fee2e2;
+}
+.config-needed-card.config-gemini a:hover {
+    color: #7f1d1d;
+}
+
 
 .config-icon {
   color: #f59e0b;
