@@ -191,7 +191,24 @@ const App = () => {
                             <p>Loading products...</p>
                         </div>
                      ` : API_ENDPOINT.includes('https://68bfa9999c70953d96f01f7f.mockapi.io/products') ? html`
-                        <p>Please configure your API endpoint in <code>index.tsx</code> to load products.</p>
+                        <div class="config-needed-card">
+                            <div class="config-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                </svg>
+                            </div>
+                            <div class="config-content">
+                                <h2>Action Required: Configure Your API</h2>
+                                <p>Your app is ready, but it needs a cloud backend to save data. Follow these steps:</p>
+                                <ol>
+                                    <li>Go to <a href="https://mockapi.io/" target="_blank" rel="noopener noreferrer">mockapi.io</a> and create a free account.</li>
+                                    <li>Create a new project, then a new <strong>resource</strong> named <code>products</code>.</li>
+                                    <li>Copy the unique API endpoint URL provided.</li>
+                                </ol>
+                                <p>Finally, open <code>index.tsx</code> and replace the placeholder URL in this line:</p>
+                                <pre><code>const API_ENDPOINT = 'YOUR_MOCKAPI_URL_HERE';</code></pre>
+                            </div>
+                        </div>
                      `: products.length === 0 ? html`
                         <p>You haven't added any products yet. Add one using the form above!</p>
                      ` : filteredProducts.length === 0 ? html`
