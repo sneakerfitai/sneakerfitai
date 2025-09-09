@@ -3,19 +3,41 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { h, render } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 
 // Initialize htm with Preact's hyperscript function
 const html = htm.bind(h);
 
+// Helper function to safely get initial products from localStorage
+const getInitialProducts = () => {
+    try {
+        const savedProducts = localStorage.getItem('affiliate-products');
+        return savedProducts ? JSON.parse(savedProducts) : [];
+    } catch (error) {
+        console.error("Failed to parse products from localStorage on init", error);
+        return [];
+    }
+};
+
 const App = () => {
-    const [products, setProducts] = useState([]);
+    const [products, setProducts] = useState(getInitialProducts());
     const [newProductName, setNewProductName] = useState('');
     const [newProductLink, setNewProductLink] = useState('');
     const [newProductImage, setNewProductImage] = useState(null);
     const [imagePreview, setImagePreview] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Effect to save products to localStorage whenever they change
+    useEffect(() => {
+        try {
+           localStorage.setItem('affiliate-products', JSON.stringify(products));
+        } catch (error) {
+            console.error("Failed to save products to localStorage", error);
+        }
+    }, [products]);
+
 
     const handleImageChange = (e) => {
         const file = e.target.files[0];
@@ -37,11 +59,6 @@ const App = () => {
         }
 
         setIsLoading(true);
-
-        // --- Backend Integration Point ---
-        // In a real application, you would upload the image to a service like Vercel Blob
-        // and then save the product details (name, link, image URL) to your database.
-        // For this demo, we'll simulate an async operation and store in-memory.
         
         await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
 
@@ -49,7 +66,7 @@ const App = () => {
             id: Date.now(),
             name: newProductName,
             link: newProductLink,
-            imageSrc: imagePreview, // In a real app, this would be the URL from your Blob storage
+            imageSrc: imagePreview,
         };
 
         setProducts(prevProducts => [newProduct, ...prevProducts]);
@@ -59,7 +76,6 @@ const App = () => {
         setNewProductLink('');
         setNewProductImage(null);
         setImagePreview('');
-        // Fix: Cast the element to HTMLInputElement to access the 'value' property.
         (document.getElementById('image-upload') as HTMLInputElement).value = null;
         setIsLoading(false);
     };
@@ -69,6 +85,10 @@ const App = () => {
     };
 
     const isFormValid = newProductName && newProductLink && newProductImage;
+
+    const filteredProducts = products.filter(product =>
+        product.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     return html`
         <div class="app-container">
@@ -109,10 +129,16 @@ const App = () => {
                 </section>
 
                 <section class="product-list-container" aria-labelledby="products-heading">
-                     <h2 id="products-heading">Your Products</h2>
-                     ${products.length === 0 ? html`<p>You haven't added any products yet. Add one using the form above!</p>` : ''}
+                     <div class="list-header">
+                        <h2 id="products-heading">Your Products</h2>
+                        <div class="search-wrapper">
+                             <input type="text" class="search-input" placeholder="Search by product name..." value=${searchTerm} onInput=${(e) => setSearchTerm(e.target.value)} />
+                        </div>
+                     </div>
+                     ${products.length === 0 && html`<p>You haven't added any products yet. Add one using the form above!</p>`}
+                     ${products.length > 0 && filteredProducts.length === 0 && html`<p>No products match your search.</p>`}
                      <div class="product-list">
-                        ${products.map(product => html`
+                        ${filteredProducts.map(product => html`
                             <div class="product-card" key=${product.id}>
                                 <img class="product-card-image" src=${product.imageSrc} alt=${product.name} />
                                 <div class="product-card-content">

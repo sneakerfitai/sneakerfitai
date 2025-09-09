@@ -193,11 +193,35 @@ input[type="file"] {
 .product-list-container {
     margin-top: 2rem;
 }
-.product-list-container h2 {
+.list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.list-header h2 {
     font-size: 1.5rem;
     font-weight: 600;
-    margin-bottom: 1.5rem;
     color: var(--secondary-color);
+    margin: 0;
+}
+.search-wrapper {
+    min-width: 250px;
+}
+.search-input {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: 0.95rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
 }
 .product-list {
   display: grid;
