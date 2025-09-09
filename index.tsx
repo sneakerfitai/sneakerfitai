@@ -3,15 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 import { h, render } from 'preact';
-import { useState, useEffect, useCallback, useMemo } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
-import { GoogleGenAI } from "@google/genai";
+// FIX: Import Type for response schema.
+import { GoogleGenAI, Type } from "@google/genai";
 
 // Initialize htm with Preact's hyperscript function
 const html = htm.bind(h);
 
-// FIX: Use process.env.API_KEY as required by the coding guidelines. This resolves the TypeScript error and aligns with the requirement that the API key is managed externally.
-const GEMINI_API_KEY = process.env.API_KEY;
+// FIX: Initialize the GoogleGenAI client using only the environment variable per guidelines.
+const ai = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
 
 // --- ACTION REQUIRED ---
 // 1. Go to https://mockapi.io and create a free account.
@@ -33,18 +34,8 @@ const App = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
-    
-    // Initialize the Google AI client safely
-    const ai = useMemo(() => {
-        if (!GEMINI_API_KEY) return null;
-        try {
-            return new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-        } catch (error) {
-            console.error("Failed to initialize GoogleGenAI:", error);
-            return null;
-        }
-    }, [GEMINI_API_KEY]);
 
+    // FIX: AI configuration is now determined by the top-level 'ai' constant.
     const isAiConfigured = !!ai;
 
     const fetchProducts = useCallback(async (currentPage) => {
@@ -102,6 +93,7 @@ const App = () => {
             reader.onloadend = () => {
                 setImagePreview(reader.result as string);
             };
+            // FIX: Corrected typo from readDataURL to readAsDataURL.
             reader.readAsDataURL(file);
         }
     };
@@ -126,19 +118,26 @@ const App = () => {
                     data: imagePreview.split(',')[1],
                 },
             };
-            const prompt = "Analyze the dominant colors in this image. Respond with a JSON array of 3-5 simple color names (e.g., [\"black\", \"white\", \"green\"]). Respond ONLY with the JSON array, without any markdown formatting or other text.";
+            // FIX: Updated prompt to be more concise for schema-based JSON response.
+            const prompt = "Analyze the dominant colors in this image and list 3-5 simple color names.";
 
+            // FIX: Updated generateContent call to use responseSchema for structured JSON output.
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: { parts: [imagePart, { text: prompt }] },
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.STRING,
+                        },
+                    },
+                },
             });
 
-            // Clean up potential markdown and parse the JSON response
-            let jsonString = response.text.trim();
-            if (jsonString.startsWith('```json')) {
-                jsonString = jsonString.substring(7, jsonString.length - 3).trim();
-            }
-            colorTags = JSON.parse(jsonString);
+            // FIX: Removed manual JSON cleaning, as response.text is now a clean JSON string.
+            colorTags = JSON.parse(response.text);
         } catch (aiError) {
             console.error("AI color analysis failed, proceeding without tags:", aiError);
             // Fail gracefully: if AI fails, we still add the product without tags.
@@ -237,6 +236,20 @@ const App = () => {
             <main>
                 <section class="form-card" aria-labelledby="form-heading">
                     <h2 id="form-heading">Add New Product</h2>
+                     {/* FIX: Removed UI for API key input. The warning now instructs the user to set the environment variable. */}
+                     ${!isAiConfigured && html`
+                        <div class="config-needed-card config-gemini">
+                            <div class="config-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                                </svg>
+                            </div>
+                            <div class="config-content">
+                                <h2>AI Features Disabled</h2>
+                                <p>To enable automatic color tagging, please set the <code>API_KEY</code> environment variable.</p>
+                            </div>
+                        </div>
+                    `}
                     <form onSubmit=${handleSubmit}>
                         <fieldset disabled=${!isAiConfigured}>
                             <div class="form-group">

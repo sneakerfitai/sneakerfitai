@@ -370,7 +370,7 @@ input[type="file"] {
 }
 
 .config-needed-card.config-gemini h2,
-.config-needed-card.config-gemini p,
+.config-needed-card.config-gemini > .config-content > p,
 .config-needed-card.config-gemini ol,
 .config-needed-card.config-gemini a {
     color: #991b1b;
@@ -397,6 +397,10 @@ input[type="file"] {
 .config-icon svg {
     width: 2rem;
     height: 2rem;
+}
+
+.config-content {
+    width: 100%;
 }
 
 .config-content h2 {
@@ -451,4 +455,39 @@ input[type="file"] {
 
 .config-content a:hover {
     color: #78350f;
+}
+
+/* API Key Input Styles */
+.api-key-input-group {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+.api-key-input-group input {
+    flex-grow: 1;
+    min-width: 200px;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid #fca5a5;
+    border-radius: var(--border-radius);
+    font-size: 0.9rem;
+}
+.api-key-input-group input:focus {
+    outline: none;
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+.api-key-input-group button {
+    flex-shrink: 0;
+    background-color: #dc2626;
+    border-color: #dc2626;
+}
+.api-key-input-group button:hover {
+    background-color: #b91c1c;
+}
+
+.api-key-note {
+    font-size: 0.8rem;
+    color: #b91c1c;
+    margin: 0;
 }
