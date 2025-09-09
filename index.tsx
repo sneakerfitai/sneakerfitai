@@ -9,9 +9,11 @@ import htm from 'htm';
 // Initialize htm with Preact's hyperscript function
 const html = htm.bind(h);
 
-// A placeholder for the base URL of your future backend API.
-// In a real app, you might use environment variables for this.
-const API_BASE_URL = '/api';
+// --- ACTION REQUIRED ---
+// 1. Go to https://mockapi.io and create a free account.
+// 2. Create a new project and then a new "Resource" named "products".
+// 3. Copy the endpoint URL and paste it below, replacing the placeholder.
+const API_ENDPOINT = 'https://68bfa9999c70953d96f01f7f.mockapi.io/products';
 
 const App = () => {
     const [products, setProducts] = useState([]);
@@ -26,20 +28,22 @@ const App = () => {
     // Effect to fetch products from the backend when the component mounts
     useEffect(() => {
         const fetchProducts = async () => {
+            if (API_ENDPOINT.includes('https://68bfa9999c70953d96f01f7f.mockapi.io/products')) {
+                console.warn("API endpoint not configured. Please add your MockAPI URL.");
+                setIsFetching(false);
+                return;
+            }
             setIsFetching(true);
             try {
-                // This fetch call will fail with a 404 error until you create a backend
-                // server that responds to this endpoint.
-                const response = await fetch(`${API_BASE_URL}/products`);
+                const response = await fetch(API_ENDPOINT);
                 if (!response.ok) {
-                    throw new Error('Network response was not ok. Is the backend running?');
+                    throw new Error('Network response was not ok. Is the API endpoint correct?');
                 }
                 const data = await response.json();
-                setProducts(data);
+                // MockAPI returns newest first, so we reverse to show newest at the top
+                setProducts(data.reverse());
             } catch (error) {
                 console.error("Failed to fetch products:", error);
-                // In a real app, you'd show a persistent error message to the user.
-                // For now, we'll just show an empty list.
                 setProducts([]);
             } finally {
                 setIsFetching(false);
@@ -63,32 +67,35 @@ const App = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!newProductName || !newProductLink || !newProductImage) {
+        if (!newProductName || !newProductLink || !imagePreview) {
             alert('Please fill all fields and select an image.');
             return;
         }
 
         setIsLoading(true);
 
-        // Use FormData to send the file and other data to the backend.
-        // This is the standard way to handle file uploads.
-        const formData = new FormData();
-        formData.append('name', newProductName);
-        formData.append('link', newProductLink);
-        formData.append('image', newProductImage); // The actual file object
+        const newProductData = {
+            name: newProductName,
+            link: newProductLink,
+            imageSrc: imagePreview, // Save the Base64 data URL of the image
+            createdAt: new Date().toISOString(), // Add a timestamp
+        };
 
         try {
-            const response = await fetch(`${API_BASE_URL}/products`, {
+            const response = await fetch(API_ENDPOINT, {
                 method: 'POST',
-                body: formData, // The browser will automatically set the correct 'Content-Type' header.
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(newProductData),
             });
 
             if (!response.ok) {
                 throw new Error('Failed to create product on the server.');
             }
 
-            const newProduct = await response.json(); // The server should return the newly created product.
-            setProducts(prevProducts => [newProduct, ...prevProducts]);
+            const createdProduct = await response.json();
+            setProducts(prevProducts => [createdProduct, ...prevProducts]);
 
             // Reset form
             setNewProductName('');
@@ -111,7 +118,7 @@ const App = () => {
         setProducts(products.filter(p => p.id !== productId));
 
         try {
-            const response = await fetch(`${API_BASE_URL}/products/${productId}`, {
+            const response = await fetch(`${API_ENDPOINT}/${productId}`, {
                 method: 'DELETE',
             });
             if (!response.ok) {
@@ -183,7 +190,9 @@ const App = () => {
                             <div class="spinner"></div>
                             <p>Loading products...</p>
                         </div>
-                     ` : products.length === 0 ? html`
+                     ` : API_ENDPOINT.includes('https://68bfa9999c70953d96f01f7f.mockapi.io/products') ? html`
+                        <p>Please configure your API endpoint in <code>index.tsx</code> to load products.</p>
+                     `: products.length === 0 ? html`
                         <p>You haven't added any products yet. Add one using the form above!</p>
                      ` : filteredProducts.length === 0 ? html`
                         <p>No products match your search.</p>
