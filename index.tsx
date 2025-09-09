@@ -12,8 +12,8 @@ const html = htm.bind(h);
 // --- ACTION REQUIRED ---
 // 1. Go to https://mockapi.io and create a free account.
 // 2. Create a new project and then a new "Resource" named "products".
-// 3. Copy the endpoint URL and paste it below, replacing the placeholder.
-const API_ENDPOINT = 'https://68bfa9999c70953d96f01f7f.mockapi.io/products';
+// 3. Copy the endpoint URL and paste it below.
+const API_ENDPOINT = 'https://68bfa9999c70953d96f01f7f.mockapi.io/products'; // 👈 PASTE YOUR MOCKAPI.IO URL HERE
 
 const App = () => {
     const [products, setProducts] = useState([]);
@@ -28,7 +28,7 @@ const App = () => {
     // Effect to fetch products from the backend when the component mounts
     useEffect(() => {
         const fetchProducts = async () => {
-            if (API_ENDPOINT.includes('https://68bfa9999c70953d96f01f7f.mockapi.io/products')) {
+            if (!API_ENDPOINT) {
                 console.warn("API endpoint not configured. Please add your MockAPI URL.");
                 setIsFetching(false);
                 return;
@@ -190,7 +190,7 @@ const App = () => {
                             <div class="spinner"></div>
                             <p>Loading products...</p>
                         </div>
-                     ` : API_ENDPOINT.includes('https://68bfa9999c70953d96f01f7f.mockapi.io/products') ? html`
+                     ` : !API_ENDPOINT ? html`
                         <div class="config-needed-card">
                             <div class="config-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
@@ -205,8 +205,8 @@ const App = () => {
                                     <li>Create a new project, then a new <strong>resource</strong> named <code>products</code>.</li>
                                     <li>Copy the unique API endpoint URL provided.</li>
                                 </ol>
-                                <p>Finally, open <code>index.tsx</code> and replace the placeholder URL in this line:</p>
-                                <pre><code>const API_ENDPOINT = 'YOUR_MOCKAPI_URL_HERE';</code></pre>
+                                <p>Finally, open <code>index.tsx</code> and paste your URL into this line:</p>
+                                <pre><code>const API_ENDPOINT = '';</code></pre>
                             </div>
                         </div>
                      `: products.length === 0 ? html`
