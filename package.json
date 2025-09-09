@@ -1,22 +1,20 @@
 {
   "name": "product-manager",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-"scripts": {
-  "dev": "vite",
-  "build": "vite build",
-  "preview": "vite preview"
-},
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
     "htm": "^3.1.1",
     "preact": "^10.27.1"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "vite": "^7.1.5"
+    "@preact/preset-vite": "^2.8.2",
+    "typescript": "^5.2.2",
+    "vite": "^5.3.1"
   }
 }
